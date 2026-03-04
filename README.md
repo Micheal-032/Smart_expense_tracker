@@ -2,7 +2,8 @@
 
 A full-stack personal expense management web app built with **Python Flask** and **SQLite**. Track spending, manage budgets, and generate reports with a clean, responsive glassmorphism UI.
 
-
+___________________________________________________________________________________________________________________________________________________________________
+ 
  🚀 Features
 
 ✅ Secure Signup/Login with session management
@@ -13,7 +14,7 @@ A full-stack personal expense management web app built with **Python Flask** and
 ✅ Filtered reports with PDF export
 ✅ Fully responsive design for all devices
 
- 
+___________________________________________________________________________________________________________________________________________________________________
  
  🛠 Tech Stack
 
@@ -23,7 +24,7 @@ A full-stack personal expense management web app built with **Python Flask** and
 🔹 Libraries: ReportLab (PDF), Matplotlib (Charts)
 
 
-
+___________________________________________________________________________________________________________________________________________________________________
 
 📦 Installation
 
@@ -40,7 +41,7 @@ python app.py
 🌐 Open your browser and go to:
 [http://localhost:5000](http://localhost:5000)
 
-
+___________________________________________________________________________________________________________________________________________________________________
 
 📖 Usage
 
@@ -50,5 +51,6 @@ python app.py
 🎯 Set monthly budgets and track progress
 📑 Generate filtered reports for financial analysis
 
-
+-------------------------------------------------------------
 ⭐ If you like this project, consider giving it a star!
+-------------------------------------------------------------
