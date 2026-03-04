@@ -13,12 +13,16 @@ A full-stack personal expense management web app built with **Python Flask** and
 ✅ Filtered reports with PDF export
 ✅ Fully responsive design for all devices
 
+ 
+ 
  🛠 Tech Stack
 
 🔹 Backend: Python Flask
 🔹 Database: SQLite
 🔹 Frontend: HTML5, CSS3, JavaScript
 🔹 Libraries: ReportLab (PDF), Matplotlib (Charts)
+
+
 
 
 📦 Installation
@@ -35,6 +39,8 @@ python app.py
 
 🌐 Open your browser and go to:
 [http://localhost:5000](http://localhost:5000)
+
+
 
 📖 Usage
 
