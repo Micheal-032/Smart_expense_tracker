@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Smart Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">💰 ExpenseTracker</div>
+            <ul class="navbar-menu">
+                <li><a href="/dashboard" class="navbar-link">Dashboard</a></li>
+                <li><a href="/expenses" class="navbar-link">Expenses</a></li>
+                <li><a href="/accounts" class="navbar-link">Accounts</a></li>
+                <li><a href="/recurring" class="navbar-link">Recurring</a></li>
+                <li><a href="/analytics" class="navbar-link">Analytics</a></li>
+                <li><a href="/goals" class="navbar-link">Goals</a></li>
+                <li><a href="/reports" class="navbar-link">Reports</a></li>
+                <li><a href="/categories" class="navbar-link">Categories</a></li>
+                <li><a href="/profile" class="navbar-link active">Profile</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <h1 class="mb-2">Profile & Settings</h1>
+
+            <div class="grid-2">
+                <!-- User Info -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">User Information</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="flex flex-column flex-gap">
+                            <div>
+                                <strong>Name:</strong>
+                                <p id="user-name" class="text-secondary ml-1">Loading...</p>
+                            </div>
+                            <div>
+                                <strong>Email:</strong>
+                                <p id="user-email" class="text-secondary ml-1">Loading...</p>
+                            </div>
+                        </div>
+                        <button class="btn btn-danger mt-2" onclick="logout()">Logout</button>
+                    </div>
+                </div>
+
+                <!-- Budget Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Monthly Budget</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="budget-success" class="alert alert-success hidden"></div>
+                        <div id="budget-error" class="alert alert-danger hidden"></div>
+
+                        <form id="budget-form">
+                            <div class="form-group">
+                                <label class="form-label" for="budget-limit">Monthly Budget Limit (₹)</label>
+                                <input type="number" id="budget-limit" class="form-control" step="100" min="0"
+                                    placeholder="30000" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Budget</button>
+                        </form>
+
+                        <div class="mt-2 text-muted" style="font-size: 0.875rem;">
+                            <p>Set your monthly spending limit. You'll receive a warning when you reach 80% of your
+                                budget.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h2 class="card-title">Account Statistics</h2>
+                </div>
+                <div class="card-body">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Expenses</div>
+                            <div class="stat-value" id="total-expenses">0</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-label">Custom Categories</div>
+                            <div class="stat-value" id="custom-categories">0</div>
+                        </div>
+                        <div class="stat-card secondary">
+                            <div class="stat-label">Account Age</div>
+                            <div class="stat-value" id="account-age">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get user from session (stored by Flask)
+        async function loadUserInfo() {
+            // Set name and email from session storage or fetch from server
+            // For simplicity, we'll get this from the dashboard API
+            try {
+                const response = await fetch('/api/dashboard/summary');
+                const result = await response.json();
+
+                if (!result.success) {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                    }
+                    return;
+                }
+
+                // Get user info (you may want to add a separate endpoint for this)
+                document.getElementById('user-name').textContent = sessionStorage.getItem('userName') || 'User';
+                document.getElementById('user-email').textContent = sessionStorage.getItem('userEmail') || 'user@example.com';
+            } catch (error) {
+                console.error('Error loading user info:', error);
+            }
+        }
+
+        // Load budget
+        async function loadBudget() {
+            try {
+                const response = await fetch('/api/budget');
+                const result = await response.json();
+
+                if (result.success && result.data.monthly_limit > 0) {
+                    document.getElementById('budget-limit').value = result.data.monthly_limit;
+                }
+            } catch (error) {
+                console.error('Error loading budget:', error);
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                // Get total expenses count
+                const expensesResponse = await fetch('/api/expenses');
+                const expensesResult = await expensesResponse.json();
+                if (expensesResult.success) {
+                    document.getElementById('total-expenses').textContent = expensesResult.data.length;
+                }
+
+                // Get categories count
+                const categoriesResponse = await fetch('/api/categories');
+                const categoriesResult = await categoriesResponse.json();
+                if (categoriesResult.success) {
+                    // Count only custom categories (not default 6)
+                    const customCount = Math.max(0, categoriesResult.data.length - 6);
+                    document.getElementById('custom-categories').textContent = customCount;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Update budget
+        document.getElementById('budget-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const successDiv = document.getElementById('budget-success');
+            const errorDiv = document.getElementById('budget-error');
+            successDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+
+            const monthlyLimit = parseFloat(document.getElementById('budget-limit').value);
+
+            try {
+                const response = await fetch('/api/budget', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ monthly_limit: monthlyLimit })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    successDiv.textContent = 'Budget updated successfully!';
+                    successDiv.classList.remove('hidden');
+                } else {
+                    errorDiv.textContent = result.message;
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Error updating budget';
+                errorDiv.classList.remove('hidden');
+            }
+        });
+
+        // Logout
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                sessionStorage.clear();
+                window.location.href = '/login';
+            } catch (error) {
+                window.location.href = '/login';
+            }
+        }
+
+        // Load data on page load
+        loadUserInfo();
+        loadBudget();
+        loadStats();
+
+        // Set account age
+        document.getElementById('account-age').textContent = 'Active';
+    </script>
+</body>
+
+</html>

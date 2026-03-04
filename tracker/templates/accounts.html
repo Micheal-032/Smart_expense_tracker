@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accounts - Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Simple Header -->
+    <div
+        style="background: rgba(255, 255, 255, 0.05); padding: 1rem; backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.25rem; font-weight: 600;">💰 Expense Tracker</div>
+            <a href="/logout" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">Logout</a>
+        </div>
+    </div>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <div class="page-header">
+                <a href="/dashboard" class="back-btn">Dashboard</a>
+                <h1>Account Management</h1>
+            </div>
+            <p>Manage your wallets and track balances across multiple accounts</p>
+        </div>
+
+        <!-- Add Account Form -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Add New Account</h2>
+            </div>
+            <div class="card-body">
+                <form id="account-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label class="form-label" for="account-name">Account Name *</label>
+                            <input type="text" id="account-name" class="form-control"
+                                placeholder="e.g., Bank Account, Wallet" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="initial-balance">Initial Balance</label>
+                            <input type="number" id="initial-balance" class="form-control" step="0.01" value="0"
+                                placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="currency">Currency</label>
+                            <select id="currency" class="form-control">
+                                <option value="INR">INR (₹)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="GBP">GBP (£)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <button type="submit" class="btn btn-primary" style="width: 100%; margin: 0;">Add
+                                Account</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Accounts Grid -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Your Accounts</h2>
+            </div>
+            <div class="card-body">
+                <div id="accounts-grid" class="stats-grid">
+                    <!-- Accounts will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Balance Summary -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Balance Summary</h2>
+            </div>
+            <div class="card-body">
+                <div class="stat-card highlight">
+                    <div class="stat-label">Total Balance (All Accounts)</div>
+                    <div class="stat-value">₹<span id="total-balance">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <script>
+        // Load accounts on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAccounts();
+        });
+
+        // Add account form submission
+        document.getElementById('account-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const accountData = {
+                name: document.getElementById('account-name').value.trim(),
+                balance: parseFloat(document.getElementById('initial-balance').value) || 0,
+                currency: document.getElementById('currency').value
+            };
+
+            try {
+                const response = await fetch('/api/accounts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(accountData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    document.getElementById('account-form').reset();
+                    loadAccounts();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to add account', 'error');
+            }
+        });
+
+        // Load all accounts
+        async function loadAccounts() {
+            try {
+                const response = await fetch('/api/accounts');
+                const data = await response.json();
+
+                if (data.success) {
+                    displayAccounts(data.data);
+                }
+            } catch (error) {
+                showAlert('Failed to load accounts', 'error');
+            }
+        }
+
+        // Display accounts in grid
+        function displayAccounts(accounts) {
+            const grid = document.getElementById('accounts-grid');
+
+            if (accounts.length === 0) {
+                grid.innerHTML = '<p class="text-muted">No accounts found. Add your first account above.</p>';
+                document.getElementById('total-balance').textContent = '0';
+                return;
+            }
+
+            let totalBalance = 0;
+            let html = '';
+
+            accounts.forEach(account => {
+                totalBalance += account.balance;
+                const currencySymbol = getCurrencySymbol(account.currency);
+
+                html += `
+                    <div class="stat-card account-card">
+                        <div class="stat-label">
+                            ${account.name}
+                            <span class="badge">${account.currency}</span>
+                        </div>
+                        <div class="stat-value">${currencySymbol}${account.balance.toFixed(2)}</div>
+                        <div class="account-actions">
+                            <button class="btn btn-sm btn-danger" onclick="deleteAccount(${account.account_id}, '${account.name}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            grid.innerHTML = html;
+            document.getElementById('total-balance').textContent = totalBalance.toFixed(2);
+        }
+
+        // Delete account
+        async function deleteAccount(accountId, accountName) {
+            if (!confirm(`Delete account "${accountName}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/accounts/${accountId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    loadAccounts();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to delete account', 'error');
+            }
+        }
+
+        // Get currency symbol
+        function getCurrencySymbol(currency) {
+            const symbols = {
+                'INR': '₹',
+                'USD': '$',
+                'EUR': '€',
+                'GBP': '£'
+            };
+            return symbols[currency] || currency;
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
+    </script>
+
+    <style>
+        .account-card {
+            position: relative;
+            padding-bottom: 65px;
+            transition: transform 0.2s;
+        }
+
+        .account-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .account-actions {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .account-actions .btn {
+            flex: 1;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: var(--primary-gradient);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .text-muted {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</body>
+
+</html>

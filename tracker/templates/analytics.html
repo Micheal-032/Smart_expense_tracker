@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Analytics - Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Simple Header -->
+    <div
+        style="background: rgba(255, 255, 255, 0.05); padding: 1rem; backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.25rem; font-weight: 600;">💰 Expense Tracker</div>
+            <a href="/logout" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">Logout</a>
+        </div>
+    </div>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <div class="page-header">
+                <a href="/dashboard" class="back-btn">Dashboard</a>
+                <h1>Advanced Analytics</h1>
+            </div>
+            <p>Deep insights into your spending patterns and financial health</p>
+        </div>
+
+        <!-- Health Score & Personality -->
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-label">Financial Health Score</div>
+                <div class="stat-value" id="health-score">--</div>
+                <div class="stat-subtitle" id="health-rating">Calculating...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Financial Personality</div>
+                <div class="stat-value" id="personality-type">--</div>
+                <div class="stat-subtitle" id="personality-details">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Spending Velocity -->
+        <div class="card">
+            <div class="card-header">
+                <h2>💨 Spending Velocity</h2>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Current Velocity</div>
+                        <div class="stat-value">₹<span id="current-velocity">0</span>/day</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Last Month Velocity</div>
+                        <div class="stat-value">₹<span id="last-velocity">0</span>/day</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Projected Monthly</div>
+                        <div class="stat-value">₹<span id="projected">0</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Trend</div>
+                        <div class="stat-value" id="velocity-trend">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost Leak Detection -->
+        <div class="card">
+            <div class="card-header">
+                <h2>🔍 Cost Leak Detection</h2>
+                <p>Small daily expenses that add up to big monthly costs</p>
+            </div>
+            <div class="card-body">
+                <div id="cost-leaks-container">
+                    <!-- Leaks will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Month Comparison -->
+        <div class="card">
+            <div class="card-header">
+                <h2>📈 Month-to-Month Comparison</h2>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">First Month</label>
+                        <input type="month" id="month1" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Second Month</label>
+                        <input type="month" id="month2" class="form-control">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end;">
+                        <button class="btn btn-primary" onclick="compareMonths()" style="width: 100%; margin: 0;">
+                            🔍 Compare Months
+                        </button>
+                    </div>
+                </div>
+                <div id="comparison-result" style="margin-top: 20px;">
+                    <!-- Comparison results -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Spending Heatmap -->
+        <div class="card">
+            <div class="card-header">
+                <h2>🗓️ Spending Heatmap</h2>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label">Select Month</label>
+                        <input type="month" id="heatmap-month" class="form-control">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end;">
+                        <button class="btn btn-secondary" onclick="loadHeatmap()" style="width: 100%; margin: 0;">
+                            📅 Load Heatmap
+                        </button>
+                    </div>
+                </div>
+                <div id="heatmap-container" style="margin-top: 20px;">
+                    <!-- Heatmap will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAnalytics();
+            setDefaultDates();
+        });
+
+        function setDefaultDates() {
+            const now = new Date();
+            const thisMonth = now.toISOString().substr(0, 7);
+            const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substr(0, 7);
+
+            document.getElementById('month1').value = lastMonth;
+            document.getElementById('month2').value = thisMonth;
+            document.getElementById('heatmap-month').value = thisMonth;
+        }
+
+        async function loadAnalytics() {
+            await Promise.all([
+                loadHealthScore(),
+                loadPersonality(),
+                loadVelocity(),
+                loadCostLeaks()
+            ]);
+        }
+
+        async function loadHealthScore() {
+            try {
+                const response = await fetch('/api/analytics/health-score');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('health-score').textContent = data.data.score;
+                    document.getElementById('health-rating').textContent = data.data.rating;
+
+                    // Color based on score
+                    const scoreEl = document.getElementById('health-score');
+                    if (data.data.score >= 80) scoreEl.style.color = '#38ef7d';
+                    else if (data.data.score >= 60) scoreEl.style.color = '#fee140';
+                    else scoreEl.style.color = '#ff6b6b';
+                }
+            } catch (error) {
+                console.error('Failed to load health score', error);
+            }
+        }
+
+        async function loadPersonality() {
+            try {
+                const response = await fetch('/api/analytics/personality');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('personality-type').textContent = data.data.personality;
+                    document.getElementById('personality-details').textContent =
+                        `${data.data.percentage.toFixed(1)}% of budget used`;
+                }
+            } catch (error) {
+                console.error('Failed to load personality', error);
+            }
+        }
+
+        async function loadVelocity() {
+            try {
+                const response = await fetch('/api/analytics/velocity');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('current-velocity').textContent = data.data.current_velocity;
+                    document.getElementById('last-velocity').textContent = data.data.last_month_velocity;
+                    document.getElementById('projected').textContent = data.data.projected_monthly;
+
+                    const trendEl = document.getElementById('velocity-trend');
+                    trendEl.textContent = data.data.comparison === 'higher' ? '📈 Up' : '📉 Down';
+                    trendEl.style.color = data.data.comparison === 'higher' ? '#ff6b6b' : '#38ef7d';
+                }
+            } catch (error) {
+                console.error('Failed to load velocity', error);
+            }
+        }
+
+        async function loadCostLeaks() {
+            try {
+                const response = await fetch('/api/analytics/cost-leaks');
+                const data = await response.json();
+
+                if (data.success) {
+                    const container = document.getElementById('cost-leaks-container');
+
+                    if (data.data.length === 0) {
+                        container.innerHTML = '<p class="text-muted">No cost leaks detected! Great job! 🎉</p>';
+                        return;
+                    }
+
+                    container.innerHTML = data.data.map(leak => `
+                        <div class="alert alert-warning">
+                            <strong>${leak.category}</strong>: Small daily expenses averaging ₹${leak.avg_daily} 
+                            (${leak.frequency} times) = ₹${leak.monthly_impact}/month impact
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load cost leaks', error);
+            }
+        }
+
+        async function compareMonths() {
+            const month1 = document.getElementById('month1').value;
+            const month2 = document.getElementById('month2').value;
+
+            if (!month1 || !month2) {
+                showAlert('Please select both months', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/analytics/comparison?month1=${month1}&month2=${month2}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const result = document.getElementById('comparison-result');
+                    const diff = data.data.difference;
+                    const pct = data.data.percentage_change;
+
+                    result.innerHTML = `
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">${month1}</div>
+                                <div class="stat-value">₹${data.data.month1.total}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">${month2}</div>
+                                <div class="stat-value">₹${data.data.month2.total}</div>
+                            </div>
+                            <div class="stat-card highlight">
+                                <div class="stat-label">Difference</div>
+                                <div class="stat-value" style="color: ${diff > 0 ? '#ff6b6b' : '#38ef7d'}">
+                                    ${diff > 0 ? '+' : ''}₹${Math.abs(diff).toFixed(2)}
+                                </div>
+                                <div class="stat-subtitle">${Math.abs(pct).toFixed(1)}% ${data.data.trend}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                showAlert('Failed to compare months', 'error');
+            }
+        }
+
+        async function loadHeatmap() {
+            const month = document.getElementById('heatmap-month').value;
+
+            if (!month) {
+                showAlert('Please select a month', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/analytics/heatmap?month=${month}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayHeatmap(data.data);
+                }
+            } catch (error) {
+                showAlert('Failed to load heatmap', 'error');
+            }
+        }
+
+        function displayHeatmap(data) {
+            const container = document.getElementById('heatmap-container');
+
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-muted">No expenses found for this month</p>';
+                return;
+            }
+
+            const maxAmount = Math.max(...data.map(d => d.amount));
+
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;">
+                    ${data.map(day => {
+                const intensity = (day.amount / maxAmount) * 100;
+                const date = new Date(day.date).getDate();
+                return `
+                            <div style="
+                                padding: 15px;
+                                background: linear-gradient(135deg, rgba(250, 112, 154, ${intensity / 100}) 0%, rgba(254, 225, 64, ${intensity / 100}) 100%);
+                                border-radius: 8px;
+                                text-align: center;
+                                border: 1px solid rgba(255,255,255,0.1);
+                            ">
+                                <div style="font-weight: 600;">${date}</div>
+                                <div style="font-size: 12px; margin-top: 5px;">₹${day.amount}</div>
+                            </div>
+                        `;
+            }).join('')}
+                </div>
+            `;
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+            setTimeout(() => alert.remove(), 3000);
+        }
+    </script>
+
+    <style>
+        .text-muted {
+            color: var(--text-secondary);
+            padding: 20px;
+            text-align: center;
+        }
+    </style>
+</body>
+
+</html>

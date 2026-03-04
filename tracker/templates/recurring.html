@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recurring Expenses - Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Simple Header -->
+    <div
+        style="background: rgba(255, 255, 255, 0.05); padding: 1rem; backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.25rem; font-weight: 600;">💰 Expense Tracker</div>
+            <a href="/logout" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">Logout</a>
+        </div>
+    </div>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <div class="page-header">
+                <a href="/dashboard" class="back-btn">Dashboard</a>
+                <h1>Recurring Expenses</h1>
+            </div>
+            <p>Automate your regular expenses - set it once, forget about it!</p>
+        </div>
+
+        <!-- Add Recurring Expense -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Add Recurring Expense</h2>
+            </div>
+            <div class="card-body">
+                <form id="recurring-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="amount">Amount *</label>
+                            <input type="number" id="amount" class="form-control" step="0.01" required
+                                placeholder="0.00">
+                        </div>
+                        <div class="form-group" style="flex: 1.5;">
+                            <label class="form-label" for="category">Category *</label>
+                            <select id="category" class="form-control" required>
+                                <!-- Categories loaded dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="cycle">Frequency *</label>
+                            <select id="cycle" class="form-control" required>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly" selected>Monthly</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="payment-mode">Payment Mode *</label>
+                            <select id="payment-mode" class="form-control" required>
+                                <option value="Cash">Cash</option>
+                                <option value="UPI">UPI</option>
+                                <option value="Card">Card</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label class="form-label" for="note">Note (Optional)</label>
+                            <input type="text" id="note" class="form-control" placeholder="e.g., Netflix subscription">
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <button type="submit" class="btn btn-primary" style="width: 100%; margin: 0;">
+                                ➕ Add Recurring Expense
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Recurring Expenses List -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Your Recurring Expenses</h2>
+                <button class="btn btn-success" onclick="processRecurring()">Process All Due</button>
+            </div>
+            <div class="card-body">
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Amount</th>
+                                <th>Category</th>
+                                <th>Frequency</th>
+                                <th>Payment Mode</th>
+                                <th>Note</th>
+                                <th>Last Added</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recurring-table">
+                            <!-- Recurring expenses loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCategories();
+            loadRecurringExpenses();
+        });
+
+        // Load categories
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+                const data = await response.json();
+
+                if (data.success) {
+                    const select = document.getElementById('category');
+                    select.innerHTML = data.data.map(cat =>
+                        `<option value="${cat.category_id}">${cat.name}</option>`
+                    ).join('');
+                }
+            } catch (error) {
+                showAlert('Failed to load categories', 'error');
+            }
+        }
+
+        // Add recurring expense
+        document.getElementById('recurring-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const recurringData = {
+                amount: parseFloat(document.getElementById('amount').value),
+                category_id: document.getElementById('category').value,
+                cycle: document.getElementById('cycle').value,
+                payment_mode: document.getElementById('payment-mode').value,
+                note: document.getElementById('note').value.trim()
+            };
+
+            try {
+                const response = await fetch('/api/recurring', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(recurringData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    document.getElementById('recurring-form').reset();
+                    loadRecurringExpenses();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to add recurring expense', 'error');
+            }
+        });
+
+        // Load recurring expenses
+        async function loadRecurringExpenses() {
+            try {
+                const response = await fetch('/api/recurring');
+                const data = await response.json();
+
+                if (data.success) {
+                    displayRecurringExpenses(data.data);
+                }
+            } catch (error) {
+                showAlert('Failed to load recurring expenses', 'error');
+            }
+        }
+
+        // Display recurring expenses
+        function displayRecurringExpenses(expenses) {
+            const tbody = document.getElementById('recurring-table');
+
+            if (expenses.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No recurring expenses found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = expenses.map(expense => `
+                <tr>
+                    <td><strong>₹${expense.amount.toFixed(2)}</strong></td>
+                    <td>${expense.category}</td>
+                    <td><span class="badge badge-${expense.cycle}">${expense.cycle}</span></td>
+                    <td>${expense.payment_mode}</td>
+                    <td>${expense.note || '-'}</td>
+                    <td><small>${expense.last_added || 'Never'}</small></td>
+                    <td>
+                        <span class="badge ${expense.is_active ? 'badge-success' : 'badge-danger'}">
+                            ${expense.is_active ? '✓ Active' : '⏸ Paused'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm ${expense.is_active ? 'btn-warning' : 'btn-success'}" 
+                                onclick="toggleRecurring(${expense.recurring_id})"
+                                style="min-width: 90px;">
+                            ${expense.is_active ? '⏸ Pause' : '▶ Activate'}
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Toggle recurring expense
+        async function toggleRecurring(recurringId) {
+            try {
+                const response = await fetch(`/api/recurring/${recurringId}/toggle`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    loadRecurringExpenses();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to toggle recurring expense', 'error');
+            }
+        }
+
+        // Process all due recurring expenses
+        async function processRecurring() {
+            try {
+                const response = await fetch('/api/recurring/process', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    loadRecurringExpenses();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to process recurring expenses', 'error');
+            }
+        }
+
+        // Show alert
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+
+            setTimeout(() => alert.remove(), 3000);
+        }
+    </script>
+
+    <style>
+        .badge-daily {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .badge-weekly {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .badge-monthly {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .badge-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .badge-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+    </style>
+</body>
+
+</html>

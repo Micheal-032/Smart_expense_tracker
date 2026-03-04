@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - Smart Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">💰 ExpenseTracker</div>
+            <ul class="navbar-menu">
+                <li><a href="/dashboard" class="navbar-link">Dashboard</a></li>
+                <li><a href="/expenses" class="navbar-link">Expenses</a></li>
+                <li><a href="/accounts" class="navbar-link">Accounts</a></li>
+                <li><a href="/recurring" class="navbar-link">Recurring</a></li>
+                <li><a href="/analytics" class="navbar-link">Analytics</a></li>
+                <li><a href="/goals" class="navbar-link">Goals</a></li>
+                <li><a href="/reports" class="navbar-link active">Reports</a></li>
+                <li><a href="/categories" class="navbar-link">Categories</a></li>
+                <li><a href="/profile" class="navbar-link">Profile</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <h1 class="mb-2">Reports & Analytics</h1>
+
+            <!-- Report Type Selector -->
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="flex flex-gap">
+                        <button class="btn btn-primary" id="btn-monthly" onclick="showReport('monthly')">Monthly
+                            Report</button>
+                        <button class="btn btn-secondary" id="btn-daily" onclick="showReport('daily')">Daily
+                            Report</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Report -->
+            <div id="monthly-report" class="report-section">
+                <div class="card mb-2">
+                    <div class="card-header">
+                        <h2 class="card-title">Select Month</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="flex flex-between" style="align-items: center;">
+                            <input type="month" id="month-selector" class="form-control" style="max-width: 300px;">
+                            <div style="display: flex; gap: 10px; margin-left: auto;">
+                                <a id="download-pdf-btn" href="#" class="btn btn-primary"
+                                    style="text-decoration: none;">
+                                    📄 Download PDF
+                                </a>
+                                <button class="btn btn-success" onclick="emailMonthlyReport()" id="email-btn">
+                                    📧 Email Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-grid mb-2">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Spending</div>
+                        <div class="stat-value">₹<span id="monthly-total">0</span></div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">By Category</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="category-breakdown"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">By Payment Mode</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="payment-breakdown"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Report -->
+            <div id="daily-report" class="report-section hidden">
+                <div class="card mb-2">
+                    <div class="card-header">
+                        <h2 class="card-title">Select Date</h2>
+                    </div>
+                    <div class="card-body">
+                        <input type="date" id="date-selector" class="form-control" style="max-width: 300px;">
+                    </div>
+                </div>
+
+                <div class="stats-grid mb-2">
+                    <div class="stat-card success">
+                        <div class="stat-label">Daily Total</div>
+                        <div class="stat-value">₹<span id="daily-total">0</span></div>
+                    </div>
+                    <div class="stat-card secondary">
+                        <div class="stat-label">Transactions</div>
+                        <div class="stat-value" id="daily-count">0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Daily Expenses</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrapper">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Amount</th>
+                                        <th>Payment</th>
+                                        <th>Note</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="daily-expenses-table">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Select a date</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set current month and date
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentDate = now.toISOString().split('T')[0];
+
+        document.getElementById('month-selector').value = currentMonth;
+        document.getElementById('date-selector').value = currentDate;
+
+        // Show/hide report sections
+        function showReport(type) {
+            if (type === 'monthly') {
+                document.getElementById('monthly-report').classList.remove('hidden');
+                document.getElementById('daily-report').classList.add('hidden');
+                document.getElementById('btn-monthly').className = 'btn btn-primary';
+                document.getElementById('btn-daily').className = 'btn btn-secondary';
+                loadMonthlyReport();
+            } else {
+                document.getElementById('monthly-report').classList.add('hidden');
+                document.getElementById('daily-report').classList.remove('hidden');
+                document.getElementById('btn-monthly').className = 'btn btn-secondary';
+                document.getElementById('btn-daily').className = 'btn btn-primary';
+                loadDailyReport();
+            }
+        }
+
+        // Email monthly report
+        async function emailMonthlyReport() {
+            const month = document.getElementById('month-selector').value;
+            const emailBtn = document.getElementById('email-btn');
+
+            // Disable button and show loading
+            emailBtn.disabled = true;
+            emailBtn.innerHTML = '⏳ Sending...';
+
+            try {
+                const response = await fetch('/api/reports/email-monthly', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ month })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show success message
+                    emailBtn.innerHTML = '✅ Sent!';
+                    emailBtn.className = 'btn btn-primary';
+
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        emailBtn.innerHTML = '📧 Email Report';
+                        emailBtn.className = 'btn btn-success';
+                        emailBtn.disabled = false;
+                    }, 2000);
+                } else {
+                    alert(result.message || 'Failed to send email');
+                    emailBtn.innerHTML = '📧 Email Report';
+                    emailBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error sending email:', error);
+                alert('An error occurred while sending the email');
+                emailBtn.innerHTML = '📧 Email Report';
+                emailBtn.disabled = false;
+            }
+        }
+
+        // Load monthly report
+        async function loadMonthlyReport() {
+            const month = document.getElementById('month-selector').value;
+
+            try {
+                const response = await fetch(`/api/reports/monthly?month=${month}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                    }
+                    return;
+                }
+
+                const data = result.data;
+
+                // Update total
+                document.getElementById('monthly-total').textContent = data.total.toLocaleString();
+
+                // Category breakdown
+                const categoryDiv = document.getElementById('category-breakdown');
+                if (data.by_category.length > 0) {
+                    categoryDiv.innerHTML = data.by_category.map(item => `
+                        <div style="margin-bottom: 1rem;">
+                            <div class="flex flex-between mb-1">
+                                <span>${item.category}</span>
+                                <span>₹${item.total.toLocaleString()} (${item.count} txn)</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: ${(item.total / data.total * 100)}%"></div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    categoryDiv.innerHTML = '<p class="text-muted">No data</p>';
+                }
+
+                // Payment mode breakdown
+                const paymentDiv = document.getElementById('payment-breakdown');
+                if (data.by_payment_mode.length > 0) {
+                    paymentDiv.innerHTML = data.by_payment_mode.map(item => `
+                        <div style="margin-bottom: 1rem;">
+                            <div class="flex flex-between mb-1">
+                                <span>${item.mode}</span>
+                                <span>₹${item.total.toLocaleString()} (${item.count} txn)</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: ${(item.total / data.total * 100)}%"></div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    paymentDiv.innerHTML = '<p class="text-muted">No data</p>';
+                }
+
+            } catch (error) {
+                console.error('Error loading monthly report:', error);
+            }
+        }
+
+        // Load daily report
+        async function loadDailyReport() {
+            const date = document.getElementById('date-selector').value;
+
+            try {
+                const response = await fetch(`/api/reports/daily?date=${date}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                    }
+                    return;
+                }
+
+                const data = result.data;
+
+                // Update stats
+                document.getElementById('daily-total').textContent = data.total.toLocaleString();
+                document.getElementById('daily-count').textContent = data.expenses.length;
+
+                // Display expenses
+                const tbody = document.getElementById('daily-expenses-table');
+                if (data.expenses.length > 0) {
+                    tbody.innerHTML = data.expenses.map(exp => `
+                        <tr>
+                            <td><span class="badge badge-primary">${exp.category}</span></td>
+                            <td>₹${exp.amount.toLocaleString()}</td>
+                            <td>${exp.payment_mode}</td>
+                            <td>${exp.note || '-'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No expenses on this date</td></tr>';
+                }
+
+            } catch (error) {
+                console.error('Error loading daily report:', error);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('month-selector').addEventListener('change', function () {
+            // Update PDF download link
+            const month = this.value;
+            document.getElementById('download-pdf-btn').href = `/api/reports/download-pdf/${month}`;
+            // Load monthly report
+            loadMonthlyReport();
+        });
+        document.getElementById('date-selector').addEventListener('change', loadDailyReport);
+
+        // Initialize PDF download link
+        const initialMonth = document.getElementById('month-selector').value || new Date().toISOString().slice(0, 7);
+        document.getElementById('download-pdf-btn').href = `/api/reports/download-pdf/${initialMonth}`;
+
+        // Load initial report
+        showReport('monthly');
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spending Challenges - Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Simple Header -->
+    <div
+        style="background: rgba(255, 255, 255, 0.05); padding: 1rem; backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.25rem; font-weight: 600;">💰 Expense Tracker</div>
+            <a href="/logout" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">Logout</a>
+        </div>
+    </div>
+
+    <div class="page-wrapper">
+        <div class="container">
+            <div class="page-header">
+                <a href="/dashboard" class="back-btn">Dashboard</a>
+                <h1>Spending Challenges</h1>
+            </div>
+            <p>Challenge yourself to control daily spending</p>
+        </div>
+
+        <!-- Add Challenge Form -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Create New Challenge</h2>
+            </div>
+            <div class="card-body">
+                <form id="challenge-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1.5;">
+                            <label class="form-label">Challenge Name *</label>
+                            <input type="text" id="challenge-name" class="form-control"
+                                placeholder="e.g., 30-Day Frugal Challenge" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Daily Spending Limit (₹) *</label>
+                            <input type="number" id="daily-limit" class="form-control" step="0.01" required
+                                placeholder="500.00">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Start Date *</label>
+                            <input type="date" id="start-date" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">End Date *</label>
+                            <input type="date" id="end-date" class="form-control" required>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <button type="submit" class="btn btn-primary" style="width: 100%; margin: 0;">
+                                🏆 Start Challenge
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Active Challenges -->
+        <div id="challenges-container">
+            <!-- Challenges will be loaded here -->
+        </div>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadChallenges();
+            setDefaultDates();
+        });
+
+        function setDefaultDates() {
+            const today = new Date().toISOString().split('T')[0];
+            const next30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+            document.getElementById('start-date').value = today;
+            document.getElementById('end-date').value = next30Days;
+        }
+
+        // Add challenge
+        document.getElementById('challenge-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const challengeData = {
+                name: document.getElementById('challenge-name').value.trim(),
+                daily_limit: parseFloat(document.getElementById('daily-limit').value),
+                start_date: document.getElementById('start-date').value,
+                end_date: document.getElementById('end-date').value
+            };
+
+            try {
+                const response = await fetch('/api/challenges', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(challengeData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    document.getElementById('challenge-form').reset();
+                    setDefaultDates();
+                    loadChallenges();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to create challenge', 'error');
+            }
+        });
+
+        // Load challenges
+        async function loadChallenges() {
+            try {
+                const response = await fetch('/api/challenges');
+                const data = await response.json();
+
+                if (data.success) {
+                    displayChallenges(data.data);
+                }
+            } catch (error) {
+                showAlert('Failed to load challenges', 'error');
+            }
+        }
+
+        // Display challenges
+        function displayChallenges(challenges) {
+            const container = document.getElementById('challenges-container');
+
+            if (challenges.length === 0) {
+                container.innerHTML = '<div class="card"><div class="card-body"><p class="text-muted">No challenges yet. Create your first spending challenge above!</p></div></div>';
+                return;
+            }
+
+            container.innerHTML = challenges.map(challenge => {
+                const totalDays = challenge.success_count + challenge.fail_count;
+                const successRate = totalDays > 0 ? (challenge.success_count / totalDays) * 100 : 0;
+                const duration = Math.ceil((new Date(challenge.end_date) - new Date(challenge.start_date)) / (1000 * 60 * 60 * 24));
+
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>${challenge.name}</h2>
+                            <span class="badge ${challenge.is_active ? 'badge-success' : 'badge-secondary'}">
+                                ${challenge.is_active ? 'Active' : 'Completed'}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-label">Daily Limit</div>
+                                    <div class="stat-value">₹${challenge.daily_limit.toFixed(2)}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Duration</div>
+                                    <div class="stat-value">${duration} days</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Success Days</div>
+                                    <div class="stat-value" style="color: #38ef7d;">${challenge.success_count}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Over Limit Days</div>
+                                    <div class="stat-value" style="color: #ff6b6b;">${challenge.fail_count}</div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                    <span>Success Rate</span>
+                                    <span style="font-weight: 600;">${successRate.toFixed(1)}%</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar" style="width: ${successRate}%; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);"></div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 15px; color: var(--text-secondary); font-size: 14px;">
+                                <div>Start: ${challenge.start_date}</div>
+                                <div>End: ${challenge.end_date}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+            setTimeout(() => alert.remove(), 3000);
+        }
+    </script>
+
+    <style>
+        .text-muted {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 20px;
+        }
+
+        .badge-secondary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</body>
+
+</html>

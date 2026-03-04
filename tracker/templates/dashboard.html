@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Smart Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">💰 ExpenseTracker</div>
+            <ul class="navbar-menu">
+                <li><a href="/dashboard" class="navbar-link active">Dashboard</a></li>
+                <li><a href="/expenses" class="navbar-link">Expenses</a></li>
+                <li><a href="/accounts" class="navbar-link">Accounts</a></li>
+                <li><a href="/recurring" class="navbar-link">Recurring</a></li>
+                <li><a href="/analytics" class="navbar-link">Analytics</a></li>
+                <li><a href="/goals" class="navbar-link">Goals</a></li>
+                <li><a href="/reports" class="navbar-link">Reports</a></li>
+                <li><a href="/categories" class="navbar-link">Categories</a></li>
+                <li><a href="/profile" class="navbar-link">Profile</a></li>
+            </ul>
+        </div>
+    </nav>
+
+
+    <div class="page-wrapper">
+        <div class="container">
+            <h1 class="mb-2">Dashboard</h1>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Monthly Total</div>
+                    <div class="stat-value">₹<span id="monthly-total">0</span></div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-label">Today's Spending</div>
+                    <div class="stat-value">₹<span id="today-total">0</span></div>
+                </div>
+                <div class="stat-card secondary">
+                    <div class="stat-label">Top Category</div>
+                    <div class="stat-value" id="top-category">Loading...</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-label">Budget Status</div>
+                    <div class="stat-value"><span id="budget-percentage">0</span>%</div>
+                </div>
+            </div>
+
+            <!-- Smart Insights -->
+            <div id="insights-container"></div>
+
+            <!-- Budget Progress -->
+            <div class="card mb-2" id="budget-card">
+                <div class="card-header">
+                    <h2 class="card-title">Budget Status</h2>
+                </div>
+                <div class="card-body">
+                    <div class="flex flex-between mb-1">
+                        <span>Spent: ₹<span id="budget-spent">0</span></span>
+                        <span>Limit: ₹<span id="budget-limit">0</span></span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" id="budget-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Category Breakdown</h2>
+                </div>
+                <div class="card-body">
+                    <div id="category-chart" class="chart-container">
+                        <div id="category-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/dashboard/summary');
+                const result = await response.json();
+
+                if (!result.success) {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                    }
+                    return;
+                }
+
+                const data = result.data;
+
+                // Update stats
+                document.getElementById('monthly-total').textContent = data.monthly_total.toLocaleString();
+                document.getElementById('today-total').textContent = data.today_total.toLocaleString();
+                document.getElementById('top-category').textContent = data.top_category;
+                document.getElementById('budget-percentage').textContent = data.budget_percentage.toFixed(1);
+
+                // Update budget
+                document.getElementById('budget-spent').textContent = data.budget_spent.toLocaleString();
+                document.getElementById('budget-limit').textContent = data.budget.toLocaleString();
+
+                const progressBar = document.getElementById('budget-progress');
+                progressBar.style.width = data.budget_percentage + '%';
+                if (data.budget_percentage >= 80) {
+                    progressBar.classList.add('danger');
+                }
+
+                // Display insights
+                const insightsContainer = document.getElementById('insights-container');
+                insightsContainer.innerHTML = '';
+
+                data.insights.forEach(insight => {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = `alert alert-${insight.type}`;
+                    alertDiv.textContent = insight.message;
+                    insightsContainer.appendChild(alertDiv);
+                });
+
+                // Display category breakdown
+                const categoryList = document.getElementById('category-list');
+                categoryList.innerHTML = '';
+
+                if (data.category_breakdown.length > 0) {
+                    const total = data.monthly_total;
+
+                    data.category_breakdown.forEach(item => {
+                        const percentage = total > 0 ? (item.amount / total * 100) : 0;
+
+                        const itemDiv = document.createElement('div');
+                        itemDiv.style.marginBottom = '1rem';
+                        itemDiv.innerHTML = `
+                            <div class="flex flex-between mb-1">
+                                <span>${item.category}</span>
+                                <span>₹${item.amount.toLocaleString()} (${percentage.toFixed(1)}%)</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: ${percentage}%"></div>
+                            </div>
+                        `;
+                        categoryList.appendChild(itemDiv);
+                    });
+                } else {
+                    categoryList.innerHTML = '<p class="text-muted">No expenses this month</p>';
+                }
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        // Load on page load
+        loadDashboard();
+    </script>
+</body>
+
+</html>
